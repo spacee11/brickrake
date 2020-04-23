@@ -1,0 +1,5 @@
+numpy
+pandas
+beautifulsoup4
+colormath
+python-algebraic
