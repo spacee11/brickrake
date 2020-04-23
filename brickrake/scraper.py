@@ -2,7 +2,9 @@
 Functions for scraping bricklink.com
 """
 import re
-import urllib.request, urllib.parse, urllib.error
+import urllib.error
+import urllib.parse
+import urllib.request
 
 from bs4 import BeautifulSoup as BS
 
@@ -88,12 +90,10 @@ def price_guide(item, max_cost_quantile=None):
 
 def store_info(country=None):
     """Fetch metadata for all stores"""
-    browse_page = utils.beautiful_soup('http://www.bricklink.com/browse.asp')
-    country_links = (
-        browse_page
-            .find(text='Stores:').parent.parent.next_sibling
-            .find_all('a', href=re.compile('countryID'))
-    )
+    browse_page = utils.beautiful_soup('https://www.bricklink.com/browse.asp')
+    country_links = browse_page.find(
+        'div', attrs={'class': 'column rightbuy'}).find_all(
+            'a', attrs={'href': re.compile('countryID')})
 
     result = []
 
@@ -105,11 +105,11 @@ def store_info(country=None):
         if country is not None and country_id != country:
             continue
 
-        country_page = utils.beautiful_soup('http://www.bricklink.com' + country_link['href'])
+        country_page = utils.beautiful_soup('https://www.bricklink.com' + country_link['href'])
         store_links = country_page.find_all('a', href=re.compile('store.asp'))
 
         for store_link in store_links:
-            store_page = utils.beautiful_soup('http://www.bricklink.com' + '/' + store_link['href'])
+            store_page = utils.beautiful_soup('https://www.bricklink.com' + '/' + store_link['href'])
             params = utils.get_params(store_page.find('frame', src=re.compile('^storeTop.asp'))['src'])
 
             store_name = params['storeName']
@@ -124,7 +124,7 @@ def store_info(country=None):
             if min_buy_elem is not None:
                 min_buy = min_buy_elem.parent.parent.parent.parent.next_sibling.find("font").text
                 try:
-                    min_buy = re.search("US \$([0-9.]+)", min_buy).group(1)
+                    min_buy = re.search(r"US \$([0-9.]+)", min_buy).group(1)
                     min_buy = float(min_buy)
                 except AttributeError:
                     # there's a minimum buy in a foreign currency :(

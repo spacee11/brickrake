@@ -21,19 +21,19 @@ Usage
 
 1. Download store information
 
-  $ python bin/main.py stores \
+  $ python main.py stores \
     --output stores.json
 
 2. Download part prices
 
-  $ python bin/main.py price_guide \
+  $ python main.py price_guide \
     --parts-list parts.bsx \
     --store-list stores.json \
     --output price_guide.json
 
 3. Find stores to use
 
-  $ gurobi.sh bin/main.py minimize \
+  $ gurobi.sh main.py minimize \
     --parts-list parts.bsx \
     --price-guide price_guide.json \
     --store-list data/stores.json \
@@ -44,7 +44,7 @@ Usage
 
 4. Create BrickLink Wanted Lists
 
-  $ python bin/main.py wanted_list \
+  $ python main.py wanted_list \
     --recommendation recommendations.json \
     --output wanted.xml
 
