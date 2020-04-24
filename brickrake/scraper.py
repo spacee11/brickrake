@@ -2,6 +2,7 @@
 Functions for scraping bricklink.com
 """
 import re
+import ast
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -93,7 +94,7 @@ def store_info(country=None):
     browse_page = utils.beautiful_soup('https://www.bricklink.com/browse.asp')
     country_links = browse_page.find(
         'div', attrs={'class': 'column rightbuy'}).find_all(
-            'a', attrs={'href': re.compile('countryID')})
+        'a', attrs={'href': re.compile('countryID')})
 
     result = []
 
@@ -110,44 +111,48 @@ def store_info(country=None):
 
         for store_link in store_links:
             store_page = utils.beautiful_soup('https://www.bricklink.com' + '/' + store_link['href'])
-            params = utils.get_params(store_page.find('frame', src=re.compile('^storeTop.asp'))['src'])
+            raw_params = [x.contents[0] for x in store_page.find_all('script') if
+                          (len(x.contents) > 0 and
+                           (re.search('StoreFront.store *=', x.contents[0]) is not None))][0]
+            store_params_str = re.search(
+                r'StoreFront\.store = {[\s\S]*?};', raw_params).group(0)[len('StoreFront.store = ')::]
+            store_params_str = re.sub('\t+\/\/.*\n', '', store_params_str)  # remove //comment lines
+            store_params_str = re.sub('\r\n\r\n', '\r\n', re.sub('\t+\r\n', '', store_params_str))  # remove empty lines
+            store_params_str = re.sub('\n\t+(.+?):',  # encase dict-like keys in parentheses
+                                      lambda match: match.group(0).replace(
+                                          match.group(1), '\'' + match.group(1) + '\''), store_params_str)
+            for old, new in [['false', 'False'], ['true', 'True']]:  # some literal replacements
+                store_params_str = store_params_str.replace(old, new)
+            try:
+                store_params = ast.literal_eval(store_params_str[:-1])  # evaluate modified string to python dict
+            except:
+                print(store_params_str)
+                raise
 
-            store_name = params['storeName']
-            store_id = params['uID']
-            country_name = params['cn']
-            country_id = params['c']
-            seller_name = params['p_seller']
-            feedback = params['p_feedback']
-
-            store_splash = utils.beautiful_soup("http://www.bricklink.com/storeSplash.asp?uID=" + store_id)
-            min_buy_elem = store_splash.find(text="Minimum Buy:")
-            if min_buy_elem is not None:
-                min_buy = min_buy_elem.parent.parent.parent.parent.next_sibling.find("font").text
-                try:
-                    min_buy = re.search(r"US \$([0-9.]+)", min_buy).group(1)
-                    min_buy = float(min_buy)
-                except AttributeError:
-                    # there's a minimum buy in a foreign currency :(
-                    continue
+            min_buy_str = store_params['minBuy']
+            if min_buy_str is not '':
+                currency_patterns = [  # basic list of currencies to match in minimum buy string, far from exhaustive
+                    (r"US \$([0-9.]+)", 1),  # includes estimated conversion to USD
+                    (r"US \$([0-9.]+)", 1.24),
+                    (r"EUR ([0-9.]+)", 1.08),
+                ]  # TODO add currency conversion / interpretation
+                min_buy = None  # min_buy stays at None if currency was not found
+                for re_pattern, conv_factor in currency_patterns:
+                    min_buy_match = re.search(re_pattern, min_buy_str)
+                    if min_buy_match is not None:
+                        min_buy = float(min_buy_match.group(1)) * conv_factor
             else:
                 min_buy = 0.0
 
-            ships_to_elem = store_splash.find(text="Store Ships To:")
-            if ships_to_elem is not None:
-                ships = ships_to_elem.parent.parent.parent.parent.next_sibling.find_all(text=True)
-                ships = [str(x) for x in ships]
-            else:
-                ships = []
-
             entry = {
-                'store_name': store_name,
-                'store_id': int(store_id),
-                'country_name': country_name,
-                'country_id': country_id,
-                'seller_name': seller_name,
-                'feedback': int(feedback),
+                'store_name': store_params['name'],
+                'store_id': int(store_params['id']),
+                'country_name': store_params['countryName'],
+                'country_id': store_params['countryID'],
+                'seller_name': store_params['username'],
+                'feedback': int(store_params['feedbackScore']),
                 'minimum_buy': min_buy,
-                'ships': ships
+                'ships': store_params['shipsToBuyer']
             }
             print(entry)
 

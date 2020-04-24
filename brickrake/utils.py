@@ -24,7 +24,7 @@ hdr = {
 
 def beautiful_soup(url):
     """Fetch a web page and return its contents as parsed by Beautiful Soup"""
-    return BS(requests.get(url, hdr=hdr).text)
+    return BS(requests.get(url, headers=hdr).text, "html.parser")
 
 
 def get_params(url):
